@@ -34,16 +34,17 @@ void setup() {
 
 
   enableOutputs(true); 
-  /*Turn all LEDs off when setting up*/
-  for (int i = 0; i  < PIN_TOTAL; i++) {
-    pinState[i] = LOW; /*Apparently, LOW is defined as 0 in the Arduino header files. Thus, it is compatible with the boolean array.*/
-    
-  }
+  turnAllOff();/*Turn all LEDs off when setting up*/
+  
   
     
 }
 
 void loop() {
+    int targ = writeRandRed();
+    float SF = 1.00;
+    greenChaser(targ,SF);
+    turnAllOff();
     
 }
 
@@ -57,6 +58,7 @@ void enableOutputs(boolean outputState){
     digitalWrite(enablePin, HIGH);
   }
 }
+
 
 /*The pinStateWrite function is supposed to allow control the state of each SR pin linked to an LED Anode.
  *Parameter value is either HIGH/'1' or LOW/'0'.
@@ -75,6 +77,18 @@ void pinStateWrite(int index, int value){
   digitalWrite(latchClockPin,HIGH);
 }
 
+void turnAllOff(){
+  for (int i = 0; i  < PIN_TOTAL; i++) {
+    pinStateWrite(i,LOW);
+  }
+}
+
+void turnGreenOff(){
+  for(int i = 0; i < RGB_LED_NUM; i ++){
+    writeGreen(greenPin[i],LOW);
+  }
+}
+
 /*The writeRed function is used to turn ON or OFF a given RED LED as long as the bit indice provided
  *is legitimate. Otherwise, it displays a message. 
 */
@@ -88,7 +102,7 @@ void writeRed(int pinNum, int value){
 }
 
 
-/**/
+/*The writeGreen() function is used to turn ON or OFF a single green LED*/
 void writeGreen(int pinNum, int value){
    bool validPinNum = inArray(greenPin,RGB_LED_NUM,pinNum); /*Searches the redPin array to find the given bit indice*/
   if (validPinNum){
@@ -99,19 +113,49 @@ void writeGreen(int pinNum, int value){
 }
 
 /*The function writeRandRed() turns ON a random Red LED*/
-void writeRandRed(){
+int writeRandRed(){
   /*Turn OFF all red LEDs*/
   for (int i = 0; i < RGB_LED_NUM; i++) {
     pinState[redPin[i]] = LOW;
   }
   /*Pick and turn on one random red LED*/
-  int randIndex = rand(RGB_LED_NUM); 
+  int randIndex = rand()%RGB_LED_NUM; 
   int pinNum = redPin[randIndex];
   pinStateWrite(pinNum, HIGH);
+  return randIndex;
 }
 
-/*This method is used to */
-void greenChaser(){
+/*This method is used to turn on the green LEDs in sequence going from lowest bit indice to highest.
+ *If any LED in the sequence is red, it is momentarily turned green then back to red as the sequence continues.
+ *Parameter targetIndex is the index of the target light in the redPin[] array
+*/
+void greenChaser(int targetIndex, float speedFactor){
+  /*It would not be appropriate for the selector and target light to be the same initially*/
+  
+  int target = redPin[targetIndex];
+  turnGreenOff();
+
+  for (int i = 0 ; i < RGB_LED_NUM ; i ++){
+    int greenBit = greenPin[i];
+    /*Turn off previous green LED before moving*/
+    if (i>0){
+      writeGreen(greenPin[i-1],LOW);
+    }
+
+    /*Handling coincidence of red and green lights*/
+    if(pinState[target] && i == targetIndex){ 
+      writeRed(target,LOW);
+      writeGreen(greenBit, HIGH);
+      delay(1000*speedFactor);
+      writeGreen(greenBit,LOW);
+      writeRed(target,HIGH);
+    } else {
+      /*Turn on current green LED*/
+      writeGreen(greenBit, HIGH);
+      delay(1000*speedFactor);
+    }
+    
+  }
   
 }
 
