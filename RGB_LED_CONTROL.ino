@@ -1,3 +1,5 @@
+#include <algorithm>
+#include <iterator>
 /* This sketch is designed to control 12 common cathode RG LEDs using 4 Arduino pins and 4 daisy-chained shift registers (74HC595)
  * Future adaptations may use 5 pins. The extra pin, being included to write to the shift register clear pin. 
  */
@@ -17,8 +19,8 @@ boolean pinState[PIN_TOTAL];/*Bitmap/Bit array that stores the ON/OFF state for 
  *The redPin and greenPin arrays map the 24 LED anodes to specific bit positions in the pinState array. 
 */
 
-int redPin[] = {1,3,5,7,9,11,13,15,17,19,21,23}; /*Bit indices for red anodes of LEDs*/
-int greenPin[] = {0,2,4,6,8,10,12,14,16,18,20,22};/*Bit indices for green anodes of LEDs*/
+int redPin[] = {5,8,10,12,14,17,19,21,24,26,28,30}; /*Bit indices for red anodes of LEDs*/
+int greenPin[] = {6,9,11,13,16,18,20,22,25,27,29,31};/*Bit indices for green anodes of LEDs*/
 
 
 
@@ -56,7 +58,9 @@ void enableOutputs(boolean outputState){
   }
 }
 
-/*The pinStateWrite function is supposed to allow control the state of each SR pin linked to an LED Anode.*/
+/*The pinStateWrite function is supposed to allow control the state of each SR pin linked to an LED Anode.
+ *Parameter value is either HIGH/'1' or LOW/'0'.
+*/
 void pinStateWrite(int index, int value){
   digitalWrite(latchClockPin,LOW);
   pinState[index] = value;
@@ -66,9 +70,56 @@ void pinStateWrite(int index, int value){
     for(int j = 0; j < 8; j++){
       if(pinState[base+j]) bitSet(bitmap, j);
     }
-    shiftOut(dataPin, clockPin, LSBFirst, bitmap);
+    shiftOut(dataPin, shiftClockPin, LSBFIRST, bitmap);
   }
   digitalWrite(latchClockPin,HIGH);
+}
+
+/*The writeRed function is used to turn ON or OFF a given RED LED as long as the bit indice provided
+ *is legitimate. Otherwise, it displays a message. 
+*/
+void writeRed(int pinNum, int value){
+  bool validPinNum = inArray(redPin,RGB_LED_NUM,pinNum); /*Searches the redPin array to find the given bit indice*/
+  if (validPinNum){
+    pinStateWrite(pinNum, value);/*If the pin is found in the redPin array, drive value (HIGH/LOW) to it. */
+  } else {
+    Serial.println("Invalid bit indice."); /*Otherwise, display a message saying the bit indice is invalid.*/
+  }
+}
+
+
+/**/
+void writeGreen(int pinNum, int value){
+   bool validPinNum = inArray(greenPin,RGB_LED_NUM,pinNum); /*Searches the redPin array to find the given bit indice*/
+  if (validPinNum){
+    pinStateWrite(pinNum, value);/*If the pin is found in the redPin array, drive value (HIGH/LOW) to it. */
+  } else {
+    Serial.println("Invalid bit indice."); /*Otherwise, display a message saying the bit indice is invalid.*/
+  }
+}
+
+/*The function writeRandRed() turns ON a random Red LED*/
+void writeRandRed(){
+  int randNum = srand(time(NULL));
+  int index = randNum % RGB_LED_NUM; /*Index in redPin array*/
+  int pinNum = redPin[index];
+  pinStateWrite(pinNum, HIGH);
+}
+
+/*This method is used to */
+void greenChaser(){
+  
+}
+
+
+/*The function inArray searches through an array to find an element. It returns a  otherwise.*/
+bool inArray (int arr[], int size, int element){
+  for (int i = 0; i < size; i++){
+    if (arr[i] == element){ 
+      return true;
+    }
+  }
+  return false;
 }
 
 /*--------------------------------SHIFT REGISTER OPERATION EXPLAINED--------------------------------*/
