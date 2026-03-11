@@ -1,5 +1,4 @@
-#include <algorithm>
-#include <iterator>
+
 /* This sketch is designed to control 12 common cathode RG LEDs using 4 Arduino pins and 4 daisy-chained shift registers (74HC595)
  * Future adaptations may use 5 pins. The extra pin, being included to write to the shift register clear pin. 
  */
@@ -26,6 +25,7 @@ int greenPin[] = {6,9,11,13,16,18,20,22,25,27,29,31};/*Bit indices for green ano
 
 void setup() {
   Serial.begin(9600);
+  randomSeed(analogRead(A0));/*The seed for the random generator comes from a floating analog pin.*/ 
 
   pinMode(dataPin, OUTPUT);
   pinMode(enablePin, OUTPUT);
@@ -100,9 +100,13 @@ void writeGreen(int pinNum, int value){
 
 /*The function writeRandRed() turns ON a random Red LED*/
 void writeRandRed(){
-  int randNum = srand(time(NULL));
-  int index = randNum % RGB_LED_NUM; /*Index in redPin array*/
-  int pinNum = redPin[index];
+  /*Turn OFF all red LEDs*/
+  for (int i = 0; i < RGB_LED_NUM; i++) {
+    pinState[redPin[i]] = LOW;
+  }
+  /*Pick and turn on one random red LED*/
+  int randIndex = rand(RGB_LED_NUM); 
+  int pinNum = redPin[randIndex];
   pinStateWrite(pinNum, HIGH);
 }
 
