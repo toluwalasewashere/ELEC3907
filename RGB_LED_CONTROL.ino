@@ -11,6 +11,7 @@ const int shiftClockPin = 9; /*Arduino pin 9 will be connected to SR pin 12 (Shi
 const int SHIFT_REG_NUM = 4; /*The total number of shift registers being daisy-chained*/
 const int PIN_TOTAL = 8 * SHIFT_REG_NUM; /*Total number of output pins available*/
 const int RGB_LED_NUM = 12; /*The total number of RGB LEDs*/
+const int MAX_RAND_ACTIVE = 5; /*The maximum number of random red LEDs that can be active at a time*/
 
 boolean pinState[PIN_TOTAL];/*Bitmap/Bit array that stores the ON/OFF state for all output bits sent to the shift registers*/
 
@@ -41,11 +42,20 @@ void setup() {
 }
 
 void loop() {
-    int targ = writeRandRed();
-    float SF = 1.00;
-    greenChaser(targ,SF);
+  Serial.println("Starting Up...");
+  delay(5000);
+  float SF = 1.00;
+  int active[MAX_RAND_ACTIVE];
+  for (int numActive = 1; numActive < 7; numActive ++){
+    Serial.print("--------- Active Random LEDs: ");
+    Serial.print(numActive);
+    Serial.println(" ---------");
+
+    writeRandRed(numActive,active);
+    delay(5000);
+    greenChaser(active,numActive,SF);
     turnAllOff();
-    
+  }
 }
 
 /*The enableOutputs function turns all shift register outputs ON or OFF dependent on the boolean outputState 
@@ -89,6 +99,12 @@ void turnGreenOff(){
   }
 }
 
+void turnRedOff(){
+  for (int i = 0; i < RGB_LED_NUM; i++) {
+    writeRed(redPin[i], LOW);
+  }
+}
+
 /*The writeRed function is used to turn ON or OFF a given RED LED as long as the bit indice provided
  *is legitimate. Otherwise, it displays a message. 
 */
@@ -112,28 +128,53 @@ void writeGreen(int pinNum, int value){
   }
 }
 
-/*The function writeRandRed() turns ON a random Red LED*/
-int writeRandRed(){
-  /*Turn OFF all red LEDs*/
-  for (int i = 0; i < RGB_LED_NUM; i++) {
-    pinState[redPin[i]] = LOW;
+
+/*The function writeRandRed generates an array of 5 random unique red LEDs but only turns on a given number of them*/
+void writeRandRed(int numActivePins, int * activeRedPins){
+  Serial.println("\n---- writeRandRed() NEW CALL ----");
+  if (numActivePins > MAX_RAND_ACTIVE){
+    Serial.print("ILLEGAL VALUE. numActivePins must be less than ");
+    Serial.println(MAX_RAND_ACTIVE);
+    return;
   }
-  /*Pick and turn on one random red LED*/
-  int randIndex = rand()%RGB_LED_NUM; 
-  int pinNum = redPin[randIndex];
-  pinStateWrite(pinNum, HIGH);
-  return randIndex;
+
+  
+  /*Turn OFF all red LEDs*/
+  turnRedOff();
+
+  /*Store Indices for 5 random red LEDs in activeRedPins array. These red LEDs will be turned on later*/
+  int newRandIndex, newPinNum;
+  bool unique;
+  for (int j = 0; j < MAX_RAND_ACTIVE; j++){
+    do{
+      newRandIndex = rand()%RGB_LED_NUM;
+      newPinNum = redPin[newRandIndex];
+
+      unique = true;
+      for (int x = 0; x < j; x++){
+        if (activeRedPins[x] == newPinNum) unique = false;
+      }
+    } while (!unique);
+    activeRedPins[j] = newPinNum;
+  }
+  
+  /*Once there are three unique red LEDs stored in the array, turn each of them ON*/
+  for (int k = 0; k < numActivePins; k++){
+    writeRed(activeRedPins[k], HIGH);
+    Serial.println(activeRedPins[k]);
+  }
 }
 
 /*This method is used to turn on the green LEDs in sequence going from lowest bit indice to highest.
  *If any LED in the sequence is red, it is momentarily turned green then back to red as the sequence continues.
  *Parameter targetIndex is the index of the target light in the redPin[] array
+ *Parameter speedFactor is used to control how long the lights are ON
 */
-void greenChaser(int targetIndex, float speedFactor){
+void greenChaser(int * targetIndexList, int numActivePins, float speedFactor){
   /*It would not be appropriate for the selector and target light to be the same initially*/
   
-  int target = redPin[targetIndex];
-  turnGreenOff();
+  //int target = redPin[targetIndex];
+  turnGreenOff();/*Turn all Green pins OFF before we start*/
 
   for (int i = 0 ; i < RGB_LED_NUM ; i ++){
     int greenBit = greenPin[i];
@@ -142,13 +183,15 @@ void greenChaser(int targetIndex, float speedFactor){
       writeGreen(greenPin[i-1],LOW);
     }
 
+    int targetIndex = *(targetIndexList+i);
+
     /*Handling coincidence of red and green lights*/
-    if(pinState[target] && i == targetIndex){ 
-      writeRed(target,LOW);
+    if(pinState[targetIndex] && i == targetIndex){ 
+      writeRed(targetIndex,LOW);
       writeGreen(greenBit, HIGH);
       delay(1000*speedFactor);
       writeGreen(greenBit,LOW);
-      writeRed(target,HIGH);
+      writeRed(targetIndex,HIGH);
     } else {
       /*Turn on current green LED*/
       writeGreen(greenBit, HIGH);
