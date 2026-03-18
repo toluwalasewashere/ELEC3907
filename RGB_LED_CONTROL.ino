@@ -44,7 +44,7 @@ void setup() {
 void loop() {
   Serial.println("Starting Up...");
   delay(5000);
-  float SF = 1.00;
+  float SF = 0.03;
   int active[MAX_RAND_ACTIVE];
   for (int numActive = 1; numActive < 7; numActive ++){
     Serial.print("--------- Active Random LEDs: ");
@@ -53,7 +53,8 @@ void loop() {
 
     writeRandRed(numActive,active);
     delay(5000);
-    greenChaser(active,numActive,SF);
+    greenChaser(active,SF);
+    greenChaserRVR(active,SF);
     turnAllOff();
   }
 }
@@ -170,10 +171,10 @@ void writeRandRed(int numActivePins, int * activeRedPins){
  *Parameter targetIndex is the index of the target light in the redPin[] array
  *Parameter speedFactor is used to control how long the lights are ON
 */
-void greenChaser(int * targetIndexList, int numActivePins, float speedFactor){
-  /*It would not be appropriate for the selector and target light to be the same initially*/
+void greenChaser(int * targetIndexList, float speedFactor){
+  /*It may not be appropriate for the selector and target light to be the same initially*/
+  Serial.println("Begin greenChaser() ...");
   
-  //int target = redPin[targetIndex];
   turnGreenOff();/*Turn all Green pins OFF before we start*/
 
   for (int i = 0 ; i < RGB_LED_NUM ; i ++){
@@ -183,28 +184,59 @@ void greenChaser(int * targetIndexList, int numActivePins, float speedFactor){
       writeGreen(greenPin[i-1],LOW);
     }
 
-    int targetIndex = *(targetIndexList+i);
+    /*If a red pin is ON: 
+     *Once we reach it turn it off, turn on the green anode of the same LED, 
+     *delay, then turn off the green anode and turn the red anode back on. 
+     */
 
     /*Handling coincidence of red and green lights*/
-    if(pinState[targetIndex] && i == targetIndex){ 
-      writeRed(targetIndex,LOW);
+    if(inArray (targetIndexList, MAX_RAND_ACTIVE, redPin[i]) && pinState[redPin[i]]){ 
+      writeRed(redPin[i],LOW);
       writeGreen(greenBit, HIGH);
       delay(1000*speedFactor);
       writeGreen(greenBit,LOW);
-      writeRed(targetIndex,HIGH);
+      writeRed(redPin[i],HIGH);
     } else {
       /*Turn on current green LED*/
       writeGreen(greenBit, HIGH);
       delay(1000*speedFactor);
     }
-    
   }
+  writeGreen(RGB_LED_NUM-1, LOW);
+}
+
+/*greenChaser() but lights travel in the oppposite direction*/
+void greenChaserRVR(int * targetIndexList, float speedFactor){
+Serial.println("Begin greenChaserRVR() ...");
   
+  turnGreenOff();/*Turn all Green pins OFF before we start*/
+
+  for (int i = RGB_LED_NUM-1 ; i >= 0 ; i--){
+    int greenBit = greenPin[i];
+    /*Turn off previous green LED before moving*/
+    if (i<RGB_LED_NUM-1){
+      writeGreen(greenPin[i+1],LOW);
+    }
+
+    /*Handling coincidence of red and green lights*/
+    if(inArray (targetIndexList, MAX_RAND_ACTIVE, redPin[i]) && pinState[redPin[i]]){ 
+      writeRed(redPin[i],LOW);
+      writeGreen(greenBit, HIGH);
+      delay(1000*speedFactor);
+      writeGreen(greenBit,LOW);
+      writeRed(redPin[i],HIGH);
+    } else {
+      /*Turn on current green LED*/
+      writeGreen(greenBit, HIGH);
+      delay(1000*speedFactor);
+    }
+  }
+  writeGreen(RGB_LED_NUM-1, LOW);
 }
 
 
 /*The function inArray searches through an array to find an element. It returns a  otherwise.*/
-bool inArray (int arr[], int size, int element){
+bool inArray (int* arr, int size, int element){
   for (int i = 0; i < size; i++){
     if (arr[i] == element){ 
       return true;
