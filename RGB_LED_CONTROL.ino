@@ -6,11 +6,11 @@
 const int dataPin = 12; /*Arduino pin 12 will be connected to SR pin 14 (Serial input pin)*/
 const int enablePin = 11; /*Arduino pin 11 will be connected to SR pin 13 (Output enable pin) */
 const int latchClockPin = 10; /*Arduino pin 10 will be connected to SR pin 12 (Storage register/Latch clock input)*/
-const int shiftClockPin = 9; /*Arduino pin 9 will be connected to SR pin 12 (Shift register clock input)*/
+const int shiftClockPin = 9; /*Arduino pin 9 will be connected to SR pin 11 (Shift register clock input)*/
 
-const int SHIFT_REG_NUM = 4; /*The total number of shift registers being daisy-chained*/
+const int SHIFT_REG_NUM = 6; /*The total number of shift registers being daisy-chained*/
 const int PIN_TOTAL = 8 * SHIFT_REG_NUM; /*Total number of output pins available*/
-const int RGB_LED_NUM = 12; /*The total number of RGB LEDs*/
+const int RGB_LED_NUM = 24; /*The total number of RGB LEDs*/
 const int MAX_RAND_ACTIVE = 5; /*The maximum number of random red LEDs that can be active at a time*/
 
 boolean pinState[PIN_TOTAL];/*Bitmap/Bit array that stores the ON/OFF state for all output bits sent to the shift registers*/
@@ -19,8 +19,8 @@ boolean pinState[PIN_TOTAL];/*Bitmap/Bit array that stores the ON/OFF state for 
  *The redPin and greenPin arrays map the 24 LED anodes to specific bit positions in the pinState array. 
 */
 
-int redPin[] = {5,8,10,12,14,17,19,21,24,26,28,30}; /*Bit indices for red anodes of LEDs*/
-int greenPin[] = {6,9,11,13,16,18,20,22,25,27,29,31};/*Bit indices for green anodes of LEDs*/
+int redPin[] = {0,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32,34,36,38,40,42,44,46,}; /*Bit indices for red anodes of LEDs*/
+int greenPin[] = {1,3,5,7,9,11,13,15,17,19,21,23,25,27,29,31,33,35,37,39,41,43,45,47};/*Bit indices for green anodes of LEDs*/
 
 
 
@@ -43,8 +43,12 @@ void setup() {
 
 void loop() {
   Serial.println("Starting Up...");
+  generalSequence(0.05);
   delay(5000);
-  float SF = 0.03;
+  turnAllOff();
+
+  Serial.println("Starting Game Mode 1 Lighting Test...");
+  float SF = 0.500;
   int active[MAX_RAND_ACTIVE];
   for (int numActive = 1; numActive < 7; numActive ++){
     Serial.print("--------- Active Random LEDs: ");
@@ -53,8 +57,8 @@ void loop() {
 
     writeRandRed(numActive,active);
     delay(5000);
-    greenChaser(active,SF);
-    greenChaserRVR(active,SF);
+    greenSequence(active,SF,1);
+    greenSequence(active,SF, -1);
     turnAllOff();
   }
 }
@@ -131,9 +135,9 @@ void writeGreen(int pinNum, int value){
 
 
 /*The function writeRandRed generates an array of 5 random unique red LEDs but only turns on a given number of them*/
-void writeRandRed(int numActivePins, int * activeRedPins){
+void writeRandRed(int numActive_SRPins, int * activeRed_SRPins){
   Serial.println("\n---- writeRandRed() NEW CALL ----");
-  if (numActivePins > MAX_RAND_ACTIVE){
+  if (numActive_SRPins > MAX_RAND_ACTIVE){
     Serial.print("ILLEGAL VALUE. numActivePins must be less than ");
     Serial.println(MAX_RAND_ACTIVE);
     return;
@@ -153,16 +157,16 @@ void writeRandRed(int numActivePins, int * activeRedPins){
 
       unique = true;
       for (int x = 0; x < j; x++){
-        if (activeRedPins[x] == newPinNum) unique = false;
+        if (activeRed_SRPins[x] == newPinNum) unique = false;
       }
     } while (!unique);
-    activeRedPins[j] = newPinNum;
+    activeRed_SRPins[j] = newPinNum;
   }
   
   /*Once there are three unique red LEDs stored in the array, turn each of them ON*/
-  for (int k = 0; k < numActivePins; k++){
-    writeRed(activeRedPins[k], HIGH);
-    Serial.println(activeRedPins[k]);
+  for (int k = 0; k < numActive_SRPins; k++){
+    writeRed(activeRed_SRPins[k], HIGH);
+    Serial.println(activeRed_SRPins[k]);
   }
 }
 
@@ -171,9 +175,9 @@ void writeRandRed(int numActivePins, int * activeRedPins){
  *Parameter targetIndex is the index of the target light in the redPin[] array
  *Parameter speedFactor is used to control how long the lights are ON
 */
-void greenChaser(int * targetIndexList, float speedFactor){
+void greenSequenceFWD(int * targetSR_PinList, float speedFactor){
   /*It may not be appropriate for the selector and target light to be the same initially*/
-  Serial.println("Begin greenChaser() ...");
+  Serial.println("Forward Green Sequence beginning...");
   
   turnGreenOff();/*Turn all Green pins OFF before we start*/
 
@@ -190,7 +194,7 @@ void greenChaser(int * targetIndexList, float speedFactor){
      */
 
     /*Handling coincidence of red and green lights*/
-    if(inArray (targetIndexList, MAX_RAND_ACTIVE, redPin[i]) && pinState[redPin[i]]){ 
+    if(inArray (targetSR_PinList, MAX_RAND_ACTIVE, redPin[i]) && pinState[redPin[i]]){ 
       writeRed(redPin[i],LOW);
       writeGreen(greenBit, HIGH);
       delay(1000*speedFactor);
@@ -205,9 +209,9 @@ void greenChaser(int * targetIndexList, float speedFactor){
   writeGreen(RGB_LED_NUM-1, LOW);
 }
 
-/*greenChaser() but lights travel in the oppposite direction*/
-void greenChaserRVR(int * targetIndexList, float speedFactor){
-Serial.println("Begin greenChaserRVR() ...");
+/*This function turns the green LEDs on in sequence going from highest bit indice to lowest bit indice.*/
+void greenSequenceRVR(int * targetSR_PinList, float speedFactor){
+Serial.println("Reverse green sequence beginning...");
   
   turnGreenOff();/*Turn all Green pins OFF before we start*/
 
@@ -219,7 +223,7 @@ Serial.println("Begin greenChaserRVR() ...");
     }
 
     /*Handling coincidence of red and green lights*/
-    if(inArray (targetIndexList, MAX_RAND_ACTIVE, redPin[i]) && pinState[redPin[i]]){ 
+    if(inArray (targetSR_PinList, MAX_RAND_ACTIVE, redPin[i]) && pinState[redPin[i]]){ 
       writeRed(redPin[i],LOW);
       writeGreen(greenBit, HIGH);
       delay(1000*speedFactor);
@@ -234,6 +238,17 @@ Serial.println("Begin greenChaserRVR() ...");
   writeGreen(RGB_LED_NUM-1, LOW);
 }
 
+/*Wrapper function for greenSequenceFWD() and greenSequenceRVR()*/
+void greenSequence(int* targetSR_PinList,float speedFactor, int direction){
+  if (direction == 1){
+    greenSequenceFWD(targetSR_PinList, speedFactor);
+  } else if (direction == -1){
+    greenSequenceRVR(targetSR_PinList, speedFactor);
+  } else {
+    Serial.println("Invalid Direction. Direction must be 1 (FORWARD) or -1 (REVERSE/BACKWARDS)");
+  }
+}
+
 
 /*The function inArray searches through an array to find an element. It returns a  otherwise.*/
 bool inArray (int* arr, int size, int element){
@@ -243,6 +258,21 @@ bool inArray (int* arr, int size, int element){
     }
   }
   return false;
+}
+
+void generalSequence(float speedFactor){
+  for (int i = 0; i < PIN_TOTAL; i++){
+    pinStateWrite(i,HIGH);
+    Serial.print("Pin ");
+    Serial.print(i);
+    Serial.print(" - STATE: ");
+    Serial.println(pinState[i]);
+
+    if(i > 0){
+      pinStateWrite(i-1, LOW);
+    }
+    delay(1000*speedFactor);
+  }
 }
 
 /*--------------------------------SHIFT REGISTER OPERATION EXPLAINED--------------------------------*/
